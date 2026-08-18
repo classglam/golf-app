@@ -1,0 +1,15 @@
+{
+  "name": "golf-coach",
+  "private": true,
+  "workspaces": [
+    "apps/api",
+    "apps/mobile",
+    "packages/shared-types"
+  ],
+  "scripts": {
+    "postinstall": "npm run build --workspace=packages/shared-types",
+    "dev:api": "npm run dev --workspace=apps/api",
+    "dev:mobile": "npm run start --workspace=apps/mobile",
+    "build:shared-types": "npm run build --workspace=packages/shared-types"
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "expo": {
+    "name": "Golf Coach",
+    "slug": "golf-coach",
+    "scheme": "golfcoach",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+    "plugins": ["expo-router"],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.golfcoach.app"
+    },
+    "android": {
+      "package": "com.golfcoach.app"
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "static"
+    }
+  }
+}

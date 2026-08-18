@@ -1,0 +1,116 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  passwordHash String   @map("password_hash")
+  name         String
+  handicap     Float?
+  lat          Float?
+  lng          Float?
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  videos Video[]
+
+  @@map("users")
+}
+
+enum VideoStatus {
+  uploaded
+  processing
+  analyzed
+  failed
+}
+
+enum ClubType {
+  driver
+  wood
+  hybrid
+  iron
+  wedge
+  putter
+}
+
+enum ViewAngle {
+  face_on
+  down_the_line
+  other
+}
+
+model Video {
+  id         String      @id @default(uuid())
+  userId     String      @map("user_id")
+  user       User        @relation(fields: [userId], references: [id])
+  storageKey String      @map("storage_key")
+  status     VideoStatus @default(uploaded)
+  clubType   ClubType?   @map("club_type")
+  viewAngle  ViewAngle?  @map("view_angle")
+  createdAt  DateTime    @default(now()) @map("created_at")
+
+  metrics  SwingMetrics?
+  analysis SwingAnalysis?
+
+  @@map("videos")
+}
+
+model SwingMetrics {
+  id              String   @id @default(uuid())
+  videoId         String   @unique @map("video_id")
+  video           Video    @relation(fields: [videoId], references: [id])
+  jointAngles     Json     @map("joint_angles")
+  phaseTimestamps Json     @map("phase_timestamps")
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  @@map("swing_metrics")
+}
+
+model SwingAnalysis {
+  id          String   @id @default(uuid())
+  videoId     String   @unique @map("video_id")
+  video       Video    @relation(fields: [videoId], references: [id])
+  summaryText String   @map("summary_text")
+  faultTags   String[] @map("fault_tags")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  recommendedExercises AnalysisExercise[]
+
+  @@map("swing_analyses")
+}
+
+enum Difficulty {
+  beginner
+  intermediate
+  advanced
+}
+
+model Exercise {
+  id          String     @id @default(uuid())
+  title       String
+  description String
+  demoUrl     String?    @map("demo_url")
+  faultTags   String[]   @map("fault_tags")
+  difficulty  Difficulty @default(beginner)
+
+  recommendedIn AnalysisExercise[]
+
+  @@map("exercises")
+}
+
+model AnalysisExercise {
+  analysisId String        @map("analysis_id")
+  analysis   SwingAnalysis @relation(fields: [analysisId], references: [id])
+  exerciseId String        @map("exercise_id")
+  exercise   Exercise      @relation(fields: [exerciseId], references: [id])
+  rank       Int
+  reason     String
+
+  @@id([analysisId, exerciseId])
+  @@map("analysis_exercises")
+}
