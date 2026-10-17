@@ -4,6 +4,7 @@ import { prisma } from "../lib/prisma";
 import { createUploadUrl } from "../lib/s3";
 import { requireAuth, type AuthedRequest } from "../lib/auth";
 import { serializeVideo } from "../lib/serialize";
+import { runClientAnalysis } from "../lib/client-analysis";
 
 export const videosRouter = Router();
 
@@ -25,12 +26,37 @@ videosRouter.post("/upload-url", async (req: AuthedRequest, res) => {
   res.json({ uploadUrl, storageKey });
 });
 
+// Checkpoints computed in the browser by apps/web (MediaPipe on WebAssembly).
+const checkpointSchema = z.object({
+  timestampSec: z.number().nonnegative(),
+  metrics: z
+    .object({
+      shoulderLineAngleDeg: z.number(),
+      hipLineAngleDeg: z.number(),
+      shoulderHipSeparationDeg: z.number(),
+      spineAngleFromVerticalDeg: z.number(),
+      frontKneeFlexDeg: z.number().nullable(),
+    })
+    .nullable(),
+  frameJpegB64: z.string().max(4_000_000).nullable(),
+});
+
 const createVideoSchema = z.object({
   storageKey: z.string().min(1),
   clubType: z
     .enum(["driver", "wood", "hybrid", "iron", "wedge", "putter"])
     .optional(),
   viewAngle: z.enum(["face_on", "down_the_line", "other"]).optional(),
+  clientCheckpoints: z
+    .object({
+      address: checkpointSchema,
+      top_of_backswing: checkpointSchema,
+      impact: checkpointSchema,
+      follow_through: checkpointSchema,
+    })
+    .partial()
+    .strict()
+    .optional(),
 });
 
 videosRouter.post("/", async (req: AuthedRequest, res) => {
@@ -49,8 +75,12 @@ videosRouter.post("/", async (req: AuthedRequest, res) => {
     },
   });
 
-  triggerAnalysis(video.id, video.storageKey).catch(async (err) => {
-    console.error("pose-worker request failed", err);
+  const analysis = parsed.data.clientCheckpoints
+    ? runClientAnalysis(video.id, parsed.data.clientCheckpoints)
+    : triggerAnalysis(video.id, video.storageKey);
+
+  analysis.catch(async (err) => {
+    console.error(`analysis failed for video ${video.id}`, err);
     await prisma.video.update({
       where: { id: video.id },
       data: { status: "failed" },

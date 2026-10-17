@@ -8,7 +8,9 @@ import { exercisesRouter } from "./routes/exercises";
 const app = express();
 
 app.use(cors());
-app.use(express.json());
+// Raised from the 100kb default: POST /videos can carry 4 base64 JPEG frames
+// when pose estimation ran in the browser (apps/web).
+app.use(express.json({ limit: "15mb" }));
 
 app.get("/health", (_req, res) => res.json({ ok: true }));
 

@@ -13,13 +13,14 @@ apps/
   api/           Node.js + Express + Prisma REST API (TypeScript)
   pose-worker/   Python + FastAPI + MediaPipe + Claude analysis service
   mobile/        Expo app (iOS / Android / Web) via Expo Router
+  web/           Vite + React web app; pose estimation runs in-browser on WebAssembly
 packages/
   shared-types/  TypeScript types shared between api and mobile
 infra/
   docker-compose.yml   Postgres + MinIO (local S3-compatible storage)
 ```
 
-`apps/api` and `apps/mobile` are npm workspaces (root `package.json`); `packages/shared-types` is a third workspace they both depend on as `@golf-coach/shared-types`. `apps/pose-worker` is a standalone Python service, not part of the npm workspace tree.
+`apps/api`, `apps/mobile` and `apps/web` are npm workspaces (root `package.json`); `packages/shared-types` is a third workspace they both depend on as `@golf-coach/shared-types`. `apps/pose-worker` is a standalone Python service, not part of the npm workspace tree.
 
 ## Commands
 
@@ -34,6 +35,7 @@ Postgres on `localhost:5432` (db `golf_coach`, user/pass `golf`/`golf`); MinIO o
 npm install                    # installs api + mobile + shared-types workspaces; postinstall builds shared-types
 npm run dev:api                # -> apps/api dev server
 npm run dev:mobile             # -> apps/mobile expo start
+npm run dev:web                # -> apps/web vite dev server, http://localhost:5173
 npm run build:shared-types     # rebuild shared-types after editing packages/shared-types/src
 ```
 
@@ -65,6 +67,14 @@ npm install
 npm run start    # expo start; press "w" for web, or npm run ios / npm run android
 ```
 
+### apps/web (from `apps/web/`)
+```bash
+cp .env.example .env
+npm run dev      # copies MediaPipe wasm into public/mediapipe/wasm, then vite
+npm run build    # copy-wasm + tsc --noEmit + vite build
+```
+No test suite; `npm run build` is the typecheck. `public/mediapipe/` is generated and gitignored.
+
 ## Architecture
 
 ### End-to-end flow
@@ -74,6 +84,12 @@ npm run start    # expo start; press "w" for web, or npm run ios / npm run andro
 4. pose-worker sends the 4 checkpoint frames (as base64 JPEGs) + computed metrics + the full exercise catalog to Claude (`apps/pose-worker/app/coach.py`) using structured output (`output_config.format = json_schema`) to get back a summary, fault tags, and ranked exercise recommendations — constrained to only pick exercises that were in the catalog it was given.
 5. pose-worker writes `SwingMetrics` and `SwingAnalysis`/`AnalysisExercise` rows and flips the video to `analyzed` (or `failed` on any pipeline exception) — **via raw SQL through `psycopg`** (`apps/pose-worker/app/db.py`), not through Prisma. The Postgres schema is the single source of truth (`apps/api/prisma/schema.prisma`); if you change it, the raw SQL in `db.py` must be updated to match by hand, there's no generated client on the Python side.
 6. Mobile polls `GET /videos/:id` until `status` moves from `processing` to `analyzed`/`failed`.
+
+### WebAssembly path (apps/web)
+`apps/web` replaces steps 3–5 above with client-side work, so the pose-worker isn't involved:
+- `apps/web/src/lib/pose.ts` is a line-by-line port of `pose.py`: same 4 checkpoint percentages and same metric formulas, run with `@mediapipe/tasks-vision` `PoseLandmarker` (WASM, GPU delegate with CPU fallback) on frames grabbed by seeking a `<video>` into a `<canvas>`. **If you change metrics or checkpoints in `pose.py`, change `pose.ts` too** (and vice versa).
+- The video is still uploaded to S3, then `POST /videos` carries `clientCheckpoints` (`SwingCheckpoints` in shared-types: per-checkpoint metrics + base64 JPEG). When present, `apps/api/src/routes/videos.ts` calls `runClientAnalysis` (`apps/api/src/lib/client-analysis.ts`) in-process instead of `triggerAnalysis`; it writes the same rows as `db.py` but through Prisma, and drops recommended exercise ids that aren't in the catalog.
+- `apps/api/src/lib/coach.ts` is the TypeScript port of `coach.py` (same prompt and schema, via `@anthropic-ai/sdk` structured outputs + `fallbacks: "default"`). Keep the two in sync. This path needs `ANTHROPIC_API_KEY` in `apps/api/.env`; the JSON body limit is raised to 15mb in `server.ts` for the frames.
 
 ### Auth
 Stateless JWT bearer tokens (`apps/api/src/lib/auth.ts`), 30-day expiry, signed with `JWT_SECRET`. `requireAuth` middleware reads `Authorization: Bearer <token>` and sets `req.userId`. Mobile persists `{token, user}` in `AsyncStorage` (`apps/mobile/lib/auth-context.tsx`) — there's no refresh flow, just re-login on 401.
