@@ -105,3 +105,6 @@ S3 object keys follow `swings/<userId>/<uuid>.<mp4|mov>` (`apps/api/src/lib/s3.t
 
 ### Language note
 User-facing strings (seed exercise library in `apps/api/prisma/seed.ts`, README) are in Spanish; code, identifiers, and comments are in English. Match this when adding exercises or other user-facing content.
+
+### Deployment
+`render.yaml` is a Render Blueprint for `apps/api` (web service) and `apps/web` (static site); Postgres and S3 storage come from Supabase. Step-by-step guide in `DEPLOY.md` (Spanish). Both services install only their own workspaces (`npm ci --workspace=...`), so the Expo app never builds on Render. The API's `start:prod` runs `prisma migrate deploy` and the (idempotent) seed before starting. Migrations live in `apps/api/prisma/migrations`; after editing `schema.prisma`, create a new one with `npm run prisma:migrate`. `apps/web` is an installable PWA (`public/manifest.webmanifest`, `public/sw.js`, registered only in production builds).
