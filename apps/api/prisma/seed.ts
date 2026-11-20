@@ -111,6 +111,12 @@ const exercises = [
 ];
 
 async function main() {
+  // Idempotent so it can run on every deploy.
+  const existing = await prisma.exercise.count();
+  if (existing > 0) {
+    console.log(`Seed omitido: ya hay ${existing} ejercicios.`);
+    return;
+  }
   for (const exercise of exercises) {
     await prisma.exercise.create({ data: exercise as any });
   }
