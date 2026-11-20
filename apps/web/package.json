@@ -1,0 +1,26 @@
+{
+  "name": "@golf-coach/web",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "copy-wasm": "node scripts/copy-mediapipe-wasm.mjs",
+    "dev": "npm run copy-wasm && vite",
+    "build": "npm run copy-wasm && tsc --noEmit && vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@golf-coach/shared-types": "*",
+    "@mediapipe/tasks-vision": "1.0.1",
+    "react": "18.2.0",
+    "react-dom": "18.2.0",
+    "react-router-dom": "6.30.1"
+  },
+  "devDependencies": {
+    "@types/react": "~18.2.79",
+    "@types/react-dom": "~18.2.25",
+    "@vitejs/plugin-react": "4.7.0",
+    "typescript": "^5.5.4",
+    "vite": "6.3.5"
+  }
+}

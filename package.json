@@ -4,12 +4,14 @@
   "workspaces": [
     "apps/api",
     "apps/mobile",
+    "apps/web",
     "packages/shared-types"
   ],
   "scripts": {
     "postinstall": "npm run build --workspace=packages/shared-types",
     "dev:api": "npm run dev --workspace=apps/api",
     "dev:mobile": "npm run start --workspace=apps/mobile",
+    "dev:web": "npm run dev --workspace=apps/web",
     "build:shared-types": "npm run build --workspace=packages/shared-types"
   }
 }

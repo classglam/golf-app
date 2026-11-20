@@ -11,6 +11,7 @@ apps/
   api/           API REST (Node.js + Express + Prisma)
   pose-worker/   Análisis de swing (Python + FastAPI + MediaPipe + Claude)
   mobile/        App Expo (iOS / Android / Web) — Expo Router
+  web/           App web (Vite + React) con detección de postura en el navegador vía WebAssembly
 packages/
   shared-types/  Tipos TypeScript compartidos entre api y mobile
 infra/
@@ -58,6 +59,19 @@ cp .env.example .env
 npm install
 npm run start              # abre en simulador iOS/Android, o pulsa "w" para web
 ```
+
+### 5. App web con WebAssembly (alternativa a 3 + 4)
+
+En esta versión, MediaPipe se ejecuta **en el navegador** (WebAssembly, con aceleración GPU si está disponible): se extraen los 4 fotogramas clave, se calculan los ángulos y la API envía todo directamente a Claude. No hace falta levantar el pose worker de Python.
+
+```bash
+# en apps/api/.env añade ANTHROPIC_API_KEY (la API llama a Claude directamente)
+cd apps/web
+cp .env.example .env
+npm run dev                # http://localhost:5173
+```
+
+El runtime WASM de MediaPipe se copia de `node_modules` a `public/mediapipe/wasm` en cada `dev`/`build`; el modelo de pose (`pose_landmarker_full.task`, ~9 MB) se descarga de Google la primera vez. El vídeo tiene que poder decodificarlo el navegador: los `.mov` en HEVC de iPhone suelen fallar en Chrome, usa MP4 (H.264).
 
 ## Flujo de prueba end-to-end
 
